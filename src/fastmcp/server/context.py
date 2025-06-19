@@ -6,9 +6,11 @@ from contextlib import contextmanager
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
 
+from fastmcp.server.elicitation import Elicitation
 from mcp import LoggingLevel
 from mcp.server.lowlevel.helper_types import ReadResourceContents
 from mcp.shared.context import RequestContext
+from mcp.shared.message import ServerMessageMetadata
 from mcp.types import (
     CreateMessageResult,
     ElicitRequestParams,
@@ -18,7 +20,7 @@ from mcp.types import (
     ModelPreferences,
     Root,
     SamplingMessage,
-    TextContent,
+    TextContent, ElicitRequest,
 )
 from pydantic.networks import AnyUrl
 from starlette.requests import Request
@@ -246,29 +248,32 @@ class Context:
 
     async def elicit(
         self,
+        elicitation: Elicitation,
         message: str,
-        requestedSchema: ElicitRequestedSchema,
+        requested_schema: ElicitRequestedSchema,
     ) -> ElicitResult:
         """Send an elicitation/create request.
 
         Args:
+            elicitation: The elicitation to present to the user
             message: The message to present to the user
-            requestedSchema: Schema defining the expected response structure
+            requested_schema: Schema defining the expected response structure
 
         Returns:
             The client's response
         """
-        return await self.send_request(
-            ElicitRequest(
-                method="elicitation/create",
+
+        result: ElicitResult = await self.request_context.session.create_message(
+            elicitation.to_mcp_elicit_request(
                 params=ElicitRequestParams(
                     message=message,
-                    requestedSchema=requestedSchema,
+                    requestedSchema=requested_schema,
                 ),
             ),
             ElicitResult,
-            metadata=ServerMessageMetadata(related_request_id=related_request_id),
         )
+
+        return result
 
     def get_http_request(self) -> Request:
         """Get the active starlette request."""
