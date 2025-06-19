@@ -11,6 +11,9 @@ from mcp.server.lowlevel.helper_types import ReadResourceContents
 from mcp.shared.context import RequestContext
 from mcp.types import (
     CreateMessageResult,
+    ElicitRequestParams,
+    ElicitRequestedSchema,
+    ElicitResult,
     ModelHint,
     ModelPreferences,
     Root,
@@ -240,6 +243,32 @@ class Context:
         )
 
         return result.content
+
+    async def elicit(
+        self,
+        message: str,
+        requestedSchema: ElicitRequestedSchema,
+    ) -> ElicitResult:
+        """Send an elicitation/create request.
+
+        Args:
+            message: The message to present to the user
+            requestedSchema: Schema defining the expected response structure
+
+        Returns:
+            The client's response
+        """
+        return await self.send_request(
+            ElicitRequest(
+                method="elicitation/create",
+                params=ElicitRequestParams(
+                    message=message,
+                    requestedSchema=requestedSchema,
+                ),
+            ),
+            ElicitResult,
+            metadata=ServerMessageMetadata(related_request_id=related_request_id),
+        )
 
     def get_http_request(self) -> Request:
         """Get the active starlette request."""
