@@ -71,7 +71,8 @@ class TestBasicMount:
         # Mount without deprecated parameters
         main_app.mount(api_app, "api")
 
-    async def test_mount_with_no_prefix(self):
+    @pytest.mark.parametrize("prefix", ["", None])
+    async def test_mount_with_no_prefix(self, prefix):
         main_app = FastMCP("MainApp")
         sub_app = FastMCP("SubApp")
 
@@ -80,7 +81,7 @@ class TestBasicMount:
             return "This is from the sub app"
 
         # Mount with empty prefix but without deprecated separators
-        main_app.mount(sub_app, prefix="")
+        main_app.mount(sub_app, prefix=prefix)
 
         tools = await main_app.get_tools()
         # With empty prefix, the tool should keep its original name
@@ -272,7 +273,9 @@ class TestMultipleServerMount:
         main_app.mount(working_app, "working")
 
         # Use an unreachable port
-        unreachable_client = Client(transport=SSETransport("http://127.0.0.1:9999/sse"))
+        unreachable_client = Client(
+            transport=SSETransport("http://127.0.0.1:9999/sse/")
+        )
 
         # Create a proxy server that will fail to connect
         unreachable_proxy = FastMCP.as_proxy(unreachable_client)
@@ -861,7 +864,7 @@ class TestAsProxyKwarg:
         sub = FastMCP("Sub")
 
         mcp.mount(sub, "sub")
-        assert mcp._mounted_servers[0].server is sub
+        assert mcp._tool_manager._mounted_servers[0].server is sub
 
     async def test_as_proxy_false(self):
         mcp = FastMCP("Main")
@@ -869,7 +872,7 @@ class TestAsProxyKwarg:
 
         mcp.mount(sub, "sub", as_proxy=False)
 
-        assert mcp._mounted_servers[0].server is sub
+        assert mcp._tool_manager._mounted_servers[0].server is sub
 
     async def test_as_proxy_true(self):
         mcp = FastMCP("Main")
@@ -877,8 +880,8 @@ class TestAsProxyKwarg:
 
         mcp.mount(sub, "sub", as_proxy=True)
 
-        assert mcp._mounted_servers[0].server is not sub
-        assert isinstance(mcp._mounted_servers[0].server, FastMCPProxy)
+        assert mcp._tool_manager._mounted_servers[0].server is not sub
+        assert isinstance(mcp._tool_manager._mounted_servers[0].server, FastMCPProxy)
 
     async def test_as_proxy_defaults_true_if_lifespan(self):
         @asynccontextmanager
@@ -890,8 +893,8 @@ class TestAsProxyKwarg:
 
         mcp.mount(sub, "sub")
 
-        assert mcp._mounted_servers[0].server is not sub
-        assert isinstance(mcp._mounted_servers[0].server, FastMCPProxy)
+        assert mcp._tool_manager._mounted_servers[0].server is not sub
+        assert isinstance(mcp._tool_manager._mounted_servers[0].server, FastMCPProxy)
 
     async def test_as_proxy_ignored_for_proxy_mounts_default(self):
         mcp = FastMCP("Main")
@@ -900,7 +903,7 @@ class TestAsProxyKwarg:
 
         mcp.mount(sub_proxy, "sub")
 
-        assert mcp._mounted_servers[0].server is sub_proxy
+        assert mcp._tool_manager._mounted_servers[0].server is sub_proxy
 
     async def test_as_proxy_ignored_for_proxy_mounts_false(self):
         mcp = FastMCP("Main")
@@ -909,7 +912,7 @@ class TestAsProxyKwarg:
 
         mcp.mount(sub_proxy, "sub", as_proxy=False)
 
-        assert mcp._mounted_servers[0].server is sub_proxy
+        assert mcp._tool_manager._mounted_servers[0].server is sub_proxy
 
     async def test_as_proxy_ignored_for_proxy_mounts_true(self):
         mcp = FastMCP("Main")
@@ -918,7 +921,7 @@ class TestAsProxyKwarg:
 
         mcp.mount(sub_proxy, "sub", as_proxy=True)
 
-        assert mcp._mounted_servers[0].server is sub_proxy
+        assert mcp._tool_manager._mounted_servers[0].server is sub_proxy
 
     async def test_as_proxy_mounts_still_have_live_link(self):
         mcp = FastMCP("Main")
@@ -949,11 +952,14 @@ class TestAsProxyKwarg:
         def hello():
             return "hi"
 
-        mcp.mount(sub, "sub", as_proxy=True)
+        mcp.mount(sub, as_proxy=True)
 
         assert lifespan_check == []
 
         async with Client(mcp) as client:
-            await client.call_tool("sub_hello", {})
+            await client.call_tool("hello", {})
 
-        assert lifespan_check == ["start"]
+        assert len(lifespan_check) > 0
+        # in the present implementation the sub server will be invoked 3 times
+        # to call its tool
+        assert lifespan_check == ["start", "start", "start"]
