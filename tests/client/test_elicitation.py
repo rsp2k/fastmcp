@@ -323,7 +323,7 @@ async def test_elicitation_handler_error():
         try:
             result = await context.elicit(message="This will fail", response_type=str)
             assert result.action == "accept"
-            return f"Got: {result.data}"
+            return f"Got: {getattr(result, 'data', None)}"
         except Exception as e:
             return f"Error: {str(e)}"
 
@@ -351,9 +351,9 @@ async def test_elicitation_multiple_calls():
         # Second question
         age_result = await context.elicit(message="What's your age?", response_type=int)
         if age_result.action != "accept":
-            return f"Hello {name_result.data}, form incomplete"
+            return f"Hello {getattr(name_result, 'data', 'Unknown')}, form incomplete"
 
-        return f"Hello {name_result.data}, you are {age_result.data} years old"
+        return f"Hello {getattr(name_result, 'data', 'Unknown')}, you are {getattr(age_result, 'data', 'Unknown')} years old"
 
     call_count = 0
 
@@ -403,7 +403,7 @@ async def test_structured_response_type(
         result = await context.elicit(
             message="Please provide your information", response_type=structured_type
         )
-        if result.action == "accept":
+        if result.action == "accept" and result.data is not None:
             if isinstance(result.data, dict):
                 return f"User: {result.data['name']}, age: {result.data['age']}"
             else:

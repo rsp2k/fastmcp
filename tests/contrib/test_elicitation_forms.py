@@ -343,7 +343,7 @@ class TestFormElicitationIntegration:
             form = NameForm(message="Please tell me your name")
             result = await form.elicit(ctx)
 
-            if result.accepted:
+            if result.accepted and result.data is not None:
                 return f"Got name: {result.data['name']}"
             elif result.declined:
                 return "User declined"
@@ -406,7 +406,7 @@ class TestFormElicitationIntegration:
             info_form = PersonInfoForm(message="Please provide your information")
             info_result = await info_form.elicit(ctx)
 
-            if not info_result.accepted:
+            if not info_result.accepted or info_result.data is None:
                 return "Information collection cancelled"
 
             name = info_result.data["name"]
@@ -418,7 +418,11 @@ class TestFormElicitationIntegration:
             )
             confirm_result = await confirm_form.elicit(ctx)
 
-            if confirm_result.accepted and confirm_result.data["confirm"]:
+            if (
+                confirm_result.accepted
+                and confirm_result.data is not None
+                and confirm_result.data["confirm"]
+            ):
                 return f"Confirmed: {name} is {age} years old"
             else:
                 return "Information not confirmed"

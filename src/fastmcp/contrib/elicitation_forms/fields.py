@@ -8,8 +8,17 @@ from __future__ import annotations
 
 import re
 from abc import ABC, abstractmethod
-from enum import StrEnum
+from enum import Enum
 from typing import TYPE_CHECKING, Any
+
+# StrEnum compatibility for Python <3.11
+try:
+    from enum import StrEnum  # Python 3.11+
+except ImportError:
+
+    class StrEnum(str, Enum):  # Backport for earlier versions
+        pass
+
 
 from .exceptions import ValidationError
 
