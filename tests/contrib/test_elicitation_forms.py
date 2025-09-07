@@ -4,23 +4,23 @@ Comprehensive tests for the elicitation forms contrib module.
 Tests the field-based elicitation forms that provide a Django-style API
 for creating rich elicitation forms with FastMCP.
 """
+
 from __future__ import annotations
 
 import pytest
+
 from fastmcp import Context, FastMCP
 from fastmcp.client.client import Client
 from fastmcp.client.elicitation import ElicitResult
-from fastmcp.exceptions import ToolError
 from fastmcp.contrib.elicitation_forms import (
-    ElicitationForm,
-    StringField,
-    IntegerField,
-    NumberField,
     BooleanField,
+    ElicitationForm,
     EnumField,
     EnumFieldChoices,
+    IntegerField,
+    NumberField,
+    StringField,
     ValidationError,
-    ElicitationError,
 )
 
 
@@ -34,7 +34,7 @@ class TestFieldValidation:
             description="A test field",
             min_length=3,
             max_length=10,
-            required=True
+            required=True,
         )
 
         # Valid cases
@@ -59,7 +59,7 @@ class TestFieldValidation:
         field = StringField(
             title="Color Choice",
             description="Pick a color",
-            choices=["red", "green", "blue"]
+            choices=["red", "green", "blue"],
         )
 
         # Valid choice
@@ -74,7 +74,7 @@ class TestFieldValidation:
         field = StringField(
             title="Email",
             description="Enter email",
-            pattern=r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+            pattern=r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$",
         )
 
         # Valid email
@@ -87,10 +87,7 @@ class TestFieldValidation:
     def test_integer_field_validation(self):
         """Test IntegerField validation with ranges."""
         field = IntegerField(
-            title="Age",
-            description="Your age",
-            minimum=0,
-            maximum=150
+            title="Age", description="Your age", minimum=0, maximum=150
         )
 
         # Valid cases
@@ -110,10 +107,7 @@ class TestFieldValidation:
     def test_number_field_validation(self):
         """Test NumberField validation with decimals."""
         field = NumberField(
-            title="Price",
-            description="Item price",
-            minimum=0.0,
-            maximum=999.99
+            title="Price", description="Item price", minimum=0.0, maximum=999.99
         )
 
         # Valid cases
@@ -130,10 +124,7 @@ class TestFieldValidation:
 
     def test_boolean_field_validation(self):
         """Test BooleanField validation and conversion."""
-        field = BooleanField(
-            title="Subscribe",
-            description="Subscribe to newsletter"
-        )
+        field = BooleanField(title="Subscribe", description="Subscribe to newsletter")
 
         # Valid cases
         assert field.validate(True) is True
@@ -153,16 +144,14 @@ class TestFieldValidation:
 
     def test_enum_field_validation(self):
         """Test EnumField validation with custom choices."""
-        
+
         class PriorityChoices(EnumFieldChoices):
             LOW = "low"
             MEDIUM = "medium"
             HIGH = "high"
 
         field = EnumField(
-            title="Priority",
-            description="Task priority",
-            choices=PriorityChoices
+            title="Priority", description="Task priority", choices=PriorityChoices
         )
 
         # Valid choices
@@ -179,7 +168,7 @@ class TestFieldValidation:
             title="Optional Field",
             description="Not required",
             required=False,
-            default="default_value"
+            default="default_value",
         )
 
         # Should return default for None
@@ -194,31 +183,19 @@ class TestFormDefinition:
 
     def test_form_metaclass_field_collection(self):
         """Test that metaclass properly collects field definitions."""
-        
+
         class TestChoices(EnumFieldChoices):
             OPTION_A = "a"
             OPTION_B = "b"
 
         class TestForm(ElicitationForm):
-            name = StringField(
-                title="Name",
-                description="Your name",
-                min_length=1
-            )
-            age = IntegerField(
-                title="Age", 
-                description="Your age",
-                minimum=0
-            )
+            name = StringField(title="Name", description="Your name", min_length=1)
+            age = IntegerField(title="Age", description="Your age", minimum=0)
             active = BooleanField(
-                title="Active",
-                description="Are you active?",
-                default=True
+                title="Active", description="Are you active?", default=True
             )
             choice = EnumField(
-                title="Choice",
-                description="Pick one",
-                choices=TestChoices
+                title="Choice", description="Pick one", choices=TestChoices
             )
 
         form = TestForm()
@@ -238,13 +215,13 @@ class TestFormDefinition:
 
     def test_form_json_schema_generation(self):
         """Test JSON schema generation from form fields."""
-        
+
         class TestForm(ElicitationForm):
             required_field = StringField(
                 title="Required",
                 description="A required field",
                 min_length=1,
-                max_length=50
+                max_length=50,
             )
             optional_field = IntegerField(
                 title="Optional",
@@ -252,7 +229,7 @@ class TestFormDefinition:
                 required=False,
                 minimum=0,
                 maximum=100,
-                default=0
+                default=0,
             )
 
         form = TestForm()
@@ -289,7 +266,7 @@ class TestFormDefinition:
 
     def test_form_with_enum_choices(self):
         """Test form schema with enum field choices."""
-        
+
         class StatusChoices(EnumFieldChoices):
             ACTIVE = "active"
             INACTIVE = "inactive"
@@ -297,9 +274,7 @@ class TestFormDefinition:
 
         class StatusForm(ElicitationForm):
             status = EnumField(
-                title="Status",
-                description="Current status",
-                choices=StatusChoices
+                title="Status", description="Current status", choices=StatusChoices
             )
 
         form = StatusForm()
@@ -313,31 +288,16 @@ class TestFormDefinition:
 
     def test_form_data_validation(self):
         """Test form data validation across multiple fields."""
-        
+
         class UserForm(ElicitationForm):
-            name = StringField(
-                title="Name",
-                min_length=2,
-                max_length=50
-            )
-            age = IntegerField(
-                title="Age",
-                minimum=0,
-                maximum=150
-            )
-            email = StringField(
-                title="Email",
-                pattern=r"^[^@]+@[^@]+\.[^@]+$"
-            )
+            name = StringField(title="Name", min_length=2, max_length=50)
+            age = IntegerField(title="Age", minimum=0, maximum=150)
+            email = StringField(title="Email", pattern=r"^[^@]+@[^@]+\.[^@]+$")
 
         form = UserForm()
 
         # Valid data
-        valid_data = {
-            "name": "John Doe",
-            "age": 30,
-            "email": "john@example.com"
-        }
+        valid_data = {"name": "John Doe", "age": 30, "email": "john@example.com"}
         cleaned = form._validate_data(valid_data)
         assert cleaned == valid_data
 
@@ -345,12 +305,12 @@ class TestFormDefinition:
         invalid_data = {
             "name": "J",  # Too short
             "age": 200,  # Too high
-            "email": "not-an-email"  # Invalid format
+            "email": "not-an-email",  # Invalid format
         }
-        
+
         with pytest.raises(ValidationError) as exc_info:
             form._validate_data(invalid_data)
-        
+
         error_msg = str(exc_info.value)
         assert "must be at least 2 characters" in error_msg
         assert "must be at most 150" in error_msg
@@ -362,17 +322,17 @@ class TestFormElicitationIntegration:
 
     def test_basic_form_elicitation(self):
         """Test basic form elicitation with accept/decline/cancel."""
-        
+
         class NameForm(ElicitationForm):
             name = StringField(
                 title="Your Name",
                 description="Please enter your full name",
-                min_length=1
+                min_length=1,
             )
-            
+
             def on_accepted(self, data):
                 return f"Hello {data['name']}!"
-            
+
             def on_declined(self):
                 return "No problem!"
 
@@ -382,7 +342,7 @@ class TestFormElicitationIntegration:
         async def get_name(ctx: Context) -> str:
             form = NameForm(message="Please tell me your name")
             result = await form.elicit(ctx)
-            
+
             if result.accepted:
                 return f"Got name: {result.data['name']}"
             elif result.declined:
@@ -419,13 +379,14 @@ class TestFormElicitationIntegration:
 
         # Run the tests (manually since we can't await in test functions)
         import asyncio
+
         asyncio.run(test_accept())
         asyncio.run(test_decline())
         asyncio.run(test_cancel())
 
     def test_form_chaining(self):
         """Test chaining multiple forms in sequence."""
-        
+
         class PersonInfoForm(ElicitationForm):
             name = StringField(title="Name", description="Your name")
             age = IntegerField(title="Age", description="Your age", minimum=0)
@@ -434,7 +395,7 @@ class TestFormElicitationIntegration:
             confirm = BooleanField(
                 title="Confirm",
                 description="Is this information correct?",
-                default=True
+                default=True,
             )
 
         mcp = FastMCP("TestServer")
@@ -444,19 +405,19 @@ class TestFormElicitationIntegration:
             # First form - collect info
             info_form = PersonInfoForm(message="Please provide your information")
             info_result = await info_form.elicit(ctx)
-            
+
             if not info_result.accepted:
                 return "Information collection cancelled"
-            
+
             name = info_result.data["name"]
             age = info_result.data["age"]
-            
+
             # Second form - confirm info
             confirm_form = ConfirmationForm(
                 message=f"You entered: {name}, age {age}. Is this correct?"
             )
             confirm_result = await confirm_form.elicit(ctx)
-            
+
             if confirm_result.accepted and confirm_result.data["confirm"]:
                 return f"Confirmed: {name} is {age} years old"
             else:
@@ -467,19 +428,13 @@ class TestFormElicitationIntegration:
         async def chaining_handler(message, response_type, params, ctx):
             nonlocal call_count
             call_count += 1
-            
+
             if call_count == 1:
                 # First call - provide person info
-                return ElicitResult(
-                    action="accept", 
-                    content={"name": "Bob", "age": 25}
-                )
+                return ElicitResult(action="accept", content={"name": "Bob", "age": 25})
             elif call_count == 2:
                 # Second call - confirm
-                return ElicitResult(
-                    action="accept",
-                    content={"confirm": True}
-                )
+                return ElicitResult(action="accept", content={"confirm": True})
             else:
                 raise ValueError("Unexpected call")
 
@@ -490,22 +445,19 @@ class TestFormElicitationIntegration:
                 assert call_count == 2
 
         import asyncio
+
         asyncio.run(test_chaining())
 
     def test_validation_error_handling(self):
         """Test handling of validation errors in elicitation."""
-        
+
         class StrictForm(ElicitationForm):
             email = StringField(
                 title="Email",
                 description="Valid email address",
-                pattern=r"^[^@]+@[^@]+\.[^@]+$"
+                pattern=r"^[^@]+@[^@]+\.[^@]+$",
             )
-            age = IntegerField(
-                title="Age",
-                minimum=18,
-                maximum=100
-            )
+            age = IntegerField(title="Age", minimum=18, maximum=100)
 
         mcp = FastMCP("TestServer")
 
@@ -527,8 +479,8 @@ class TestFormElicitationIntegration:
                 action="accept",
                 content={
                     "email": "not-an-email",  # Invalid
-                    "age": 15  # Too young
-                }
+                    "age": 15,  # Too young
+                },
             )
 
         async def test_validation_error():
@@ -539,16 +491,14 @@ class TestFormElicitationIntegration:
                 assert "must be at least 18" in result.data
 
         import asyncio
+
         asyncio.run(test_validation_error())
 
     def test_graceful_fallback_when_elicitation_not_supported(self):
         """Test graceful handling when client doesn't support elicitation."""
-        
+
         class SimpleForm(ElicitationForm):
-            message_text = StringField(
-                title="Message",
-                description="Enter a message"
-            )
+            message_text = StringField(title="Message", description="Enter a message")
 
         mcp = FastMCP("TestServer")
 
@@ -570,6 +520,7 @@ class TestFormElicitationIntegration:
                 assert "ElicitationNotSupportedError" in result.data
 
         import asyncio
+
         asyncio.run(test_fallback())
 
 
@@ -584,11 +535,11 @@ class TestFieldSchemaGeneration:
             min_length=3,
             max_length=20,
             pattern=r"^[a-zA-Z]+$",
-            default="test"
+            default="test",
         )
-        
+
         schema = field.to_schema_property()
-        
+
         assert schema == {
             "type": "string",
             "title": "Test Field",
@@ -596,7 +547,7 @@ class TestFieldSchemaGeneration:
             "minLength": 3,
             "maxLength": 20,
             "pattern": r"^[a-zA-Z]+$",
-            "default": "test"
+            "default": "test",
         }
 
     def test_integer_field_schema_completeness(self):
@@ -606,59 +557,52 @@ class TestFieldSchemaGeneration:
             description="Number of items",
             minimum=1,
             maximum=100,
-            default=10
+            default=10,
         )
-        
+
         schema = field.to_schema_property()
-        
+
         assert schema == {
             "type": "integer",
             "title": "Count",
             "description": "Number of items",
             "minimum": 1,
             "maximum": 100,
-            "default": 10
+            "default": 10,
         }
 
     def test_number_field_schema_completeness(self):
         """Test NumberField generates complete JSON schema."""
         field = NumberField(
-            title="Price",
-            description="Item price in USD",
-            minimum=0.01,
-            maximum=999.99
+            title="Price", description="Item price in USD", minimum=0.01, maximum=999.99
         )
-        
+
         schema = field.to_schema_property()
-        
+
         assert schema == {
             "type": "number",
             "title": "Price",
             "description": "Item price in USD",
             "minimum": 0.01,
-            "maximum": 999.99
+            "maximum": 999.99,
         }
 
     def test_boolean_field_schema_completeness(self):
         """Test BooleanField generates complete JSON schema."""
-        field = BooleanField(
-            title="Active",
-            description="Is active?",
-            default=False
-        )
-        
+        field = BooleanField(title="Active", description="Is active?", default=False)
+
         schema = field.to_schema_property()
-        
+
         assert schema == {
             "type": "boolean",
             "title": "Active",
             "description": "Is active?",
-            "default": False
+            "default": False,
         }
 
     def test_enum_field_schema_completeness(self):
         """Test EnumField generates complete JSON schema with choices."""
-        
+
         class StatusChoices(EnumFieldChoices):
             DRAFT = "draft"
             PUBLISHED = "published"
@@ -668,17 +612,17 @@ class TestFieldSchemaGeneration:
             title="Status",
             description="Document status",
             choices=StatusChoices,
-            default="draft"
+            default="draft",
         )
-        
+
         schema = field.to_schema_property()
-        
+
         assert schema == {
             "title": "Status",
-            "description": "Document status", 
+            "description": "Document status",
             "default": "draft",
             "enum": ["draft", "published", "archived"],
-            "enumNames": ["Draft", "Published", "Archived"]
+            "enumNames": ["Draft", "Published", "Archived"],
         }
 
 
@@ -691,15 +635,15 @@ class TestEventHandlers:
 
         class TestForm(ElicitationForm):
             name = StringField(title="Name", description="Your name")
-            
+
             def on_accepted(self, data):
                 handler_calls.append(("accepted", data))
                 return f"Hello {data['name']}!"
-            
+
             def on_declined(self):
                 handler_calls.append(("declined", None))
                 return "Goodbye!"
-            
+
             def on_canceled(self):
                 handler_calls.append(("canceled", None))
                 return "Maybe later!"
@@ -707,15 +651,15 @@ class TestEventHandlers:
         # Note: Event handlers are called internally by the form.elicit() method
         # This test verifies the handler definitions are correct
         form = TestForm()
-        
+
         # Test handler definitions exist and are callable
         assert hasattr(form, "on_accepted")
         assert callable(form.on_accepted)
-        assert hasattr(form, "on_declined") 
+        assert hasattr(form, "on_declined")
         assert callable(form.on_declined)
         assert hasattr(form, "on_canceled")
         assert callable(form.on_canceled)
-        
+
         # Test handlers can be called directly
         result = form.on_accepted({"name": "Test"})
         assert result == "Hello Test!"
@@ -723,26 +667,29 @@ class TestEventHandlers:
 
     def test_async_event_handlers(self):
         """Test that async event handlers work correctly."""
-        
+
         class AsyncForm(ElicitationForm):
             message_text = StringField(title="Message", description="Enter message")
-            
+
             async def on_accepted(self, data):
                 # Simulate async operation
+                import asyncio
+
                 await asyncio.sleep(0.01)
                 return f"Processed: {data['message_text']}"
 
         form = AsyncForm()
-        
+
         # Verify async handler exists
         assert hasattr(form, "on_accepted")
         import inspect
+
         assert inspect.iscoroutinefunction(form.on_accepted)
 
 
 def test_field_inheritance_and_composition():
     """Test that fields can be inherited and composed properly."""
-    
+
     class BaseChoices(EnumFieldChoices):
         OPTION_1 = "opt1"
         OPTION_2 = "opt2"
@@ -759,34 +706,36 @@ def test_field_inheritance_and_composition():
     extended = ExtendedForm()
     assert len(extended._fields) == 4
     assert "name" in extended._fields
-    assert "choice" in extended._fields 
+    assert "choice" in extended._fields
     assert "email" in extended._fields
     assert "age" in extended._fields
 
     # Test schema generation works with inheritance
     schema = extended._to_json_schema()
     assert len(schema["properties"]) == 4
-    assert all(field in schema["properties"] for field in ["name", "choice", "email", "age"])
+    assert all(
+        field in schema["properties"] for field in ["name", "choice", "email", "age"]
+    )
 
 
 def test_form_field_access():
     """Test accessing field values through form instance."""
-    
+
     class TestForm(ElicitationForm):
         name = StringField(title="Name", default="default_name")
         count = IntegerField(title="Count", default=5)
 
     form = TestForm()
-    
+
     # Test default value access
     assert form.name == "default_name"
     assert form.count == 5
-    
+
     # Test setting cleaned data
     form.cleaned_data = {"name": "Alice", "count": 10}
     assert form.name == "Alice"
     assert form.count == 10
-    
+
     # Test accessing non-existent field raises AttributeError
     with pytest.raises(AttributeError):
         _ = form.nonexistent_field
