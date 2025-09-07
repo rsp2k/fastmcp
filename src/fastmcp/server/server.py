@@ -29,8 +29,15 @@ from mcp.types import (
     Annotations,
     AnyFunction,
     CallToolRequestParams,
+    CompleteResult,
+    Completion,
+    CompletionArgument,
+    CompletionContext,
     ContentBlock,
     GetPromptResult,
+    PromptReference,
+    ResourceReference,
+    ResourceTemplateReference,
     ToolAnnotations,
 )
 from mcp.types import Prompt as MCPPrompt
@@ -191,6 +198,9 @@ class FastMCP(Generic[LifespanResultT]):
             mask_error_details=mask_error_details,
         )
         self._tool_serializer = tool_serializer
+
+        # Storage for completion handlers
+        self._completion_handlers: dict[str, Callable[..., Awaitable[list[str]]]] = {}
 
         if lifespan is None:
             self._has_lifespan = False
@@ -393,6 +403,7 @@ class FastMCP(Generic[LifespanResultT]):
         self._mcp_server.call_tool()(self._mcp_call_tool)
         self._mcp_server.read_resource()(self._mcp_read_resource)
         self._mcp_server.get_prompt()(self._mcp_get_prompt)
+        self._mcp_server.completion()(self._mcp_completion)
 
     async def _apply_middleware(
         self,
@@ -852,6 +863,74 @@ class FastMCP(Generic[LifespanResultT]):
             fastmcp_context=fastmcp.server.dependencies.get_context(),
         )
         return await self._apply_middleware(mw_context, _handler)
+
+    async def _mcp_completion(
+        self,
+        ref: ResourceReference | ResourceTemplateReference | PromptReference,
+        argument: CompletionArgument,
+        context: CompletionContext | None = None,
+    ) -> Completion:
+        """Handle MCP completion requests."""
+        logger.debug(
+            f"[{self.name}] Handler called: completion for {ref} argument {argument.name}"
+        )
+
+        async with fastmcp.server.context.Context(fastmcp=self):
+            try:
+                result = await self._completion(ref, argument, context)
+                return result.completion
+            except NotFoundError:
+                # Return empty completion for unknown references
+                return Completion(values=[], total=0, hasMore=False)
+
+    async def _completion(
+        self,
+        ref: ResourceReference | ResourceTemplateReference | PromptReference,
+        argument: CompletionArgument,
+        context: CompletionContext | None = None,
+    ) -> CompleteResult:
+        """Execute completion handlers for the given reference and argument."""
+
+        # Determine reference type and construct handler key
+        if isinstance(ref, ResourceReference):
+            ref_type = "resource"
+            ref_identifier = ref.uri
+        elif isinstance(ref, ResourceTemplateReference):
+            ref_type = "resource_template"
+            ref_identifier = ref.uri
+        else:  # PromptReference
+            ref_type = "prompt"
+            ref_identifier = ref.name
+
+        handler_key = f"{ref_type}:{ref_identifier}:{argument.name}"
+
+        # Look for registered completion handler
+        if handler_key in self._completion_handlers:
+            handler = self._completion_handlers[handler_key]
+            try:
+                # Execute the completion handler
+                completion_values = await handler(argument.value)
+
+                # Limit to 100 items per MCP spec
+                completion_values = completion_values[:100] if completion_values else []
+
+                return CompleteResult(
+                    completion=Completion(
+                        values=completion_values,
+                        total=len(completion_values),
+                        hasMore=len(completion_values)
+                        == 100,  # Might be more if we hit the limit
+                    )
+                )
+            except Exception as e:
+                logger.error(f"Completion handler error for {handler_key}: {e}")
+                # Return empty completion on handler error
+                return CompleteResult(
+                    completion=Completion(values=[], total=0, hasMore=False)
+                )
+
+        # No handler found, return empty completion
+        return CompleteResult(completion=Completion(values=[], total=0, hasMore=False))
 
     def add_tool(self, tool: Tool) -> Tool:
         """Add a tool to the server.
@@ -2201,6 +2280,50 @@ class FastMCP(Generic[LifespanResultT]):
                 return False
 
         return True
+
+    def completion(
+        self,
+        ref_type: Literal["resource", "resource_template", "prompt"],
+        name_or_uri: str,
+        argument: str,
+    ) -> Callable[
+        [Callable[[str], Awaitable[list[str]]]], Callable[[str], Awaitable[list[str]]]
+    ]:
+        """
+        Decorator to register a completion handler for resources, resource templates, or prompts.
+
+        Args:
+            ref_type: Type of reference ("resource", "resource_template", or "prompt")
+            name_or_uri: The resource URI pattern, resource template URI, or prompt name
+            argument: The specific argument to provide completions for
+
+        Example:
+            ```python
+            @mcp.completion("resource", "file:///{path*}", "path")
+            async def complete_file_path(partial: str) -> list[str]:
+                # Return file path suggestions based on partial input
+                return ["file1.txt", "dir/file2.txt"] if partial.startswith("f") else []
+
+            @mcp.completion("prompt", "analyze_data", "dataset")
+            async def complete_dataset(partial: str) -> list[str]:
+                # Return dataset suggestions
+                return ["customers", "products", "sales"] if not partial else [
+                    name for name in ["customers", "products", "sales"]
+                    if name.startswith(partial.lower())
+                ]
+            ```
+        """
+
+        def decorator(
+            func: Callable[[str], Awaitable[list[str]]],
+        ) -> Callable[[str], Awaitable[list[str]]]:
+            # Register the completion handler with a unique key
+            handler_key = f"{ref_type}:{name_or_uri}:{argument}"
+            self._completion_handlers[handler_key] = func
+            logger.debug(f"[{self.name}] Registered completion handler: {handler_key}")
+            return func
+
+        return decorator
 
     @classmethod
     def generate_name(cls, name: str | None = None) -> str:
