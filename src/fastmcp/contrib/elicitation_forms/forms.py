@@ -107,9 +107,10 @@ class ElicitationForm(metaclass=ElicitationFormMeta):
             message: Message to show when eliciting
             **field_overrides: Override field values/properties
         """
-        self.message = message
-        self.cleaned_data = {}
-        self._field_overrides = field_overrides
+        # Initialize cleaned_data first to avoid recursion in __setattr__
+        super().__setattr__('cleaned_data', {})
+        super().__setattr__('_field_overrides', field_overrides)
+        super().__setattr__('message', message)
         
         # Apply field overrides
         for field_name, overrides in field_overrides.items():
@@ -139,13 +140,17 @@ class ElicitationForm(metaclass=ElicitationFormMeta):
             # Convert fields to JSON schema
             schema = self._to_json_schema()
             
-            # Use FastMCP's elicitation
-            result = await ctx.elicit(elicit_message, schema)
+            # Use FastMCP's low-level elicitation with custom schema
+            result = await ctx.session.elicit(
+                message=elicit_message,
+                requestedSchema=schema,
+                related_request_id=ctx.request_id,
+            )
             
-            if result.action == "accept" and result.data:
+            if result.action == "accept" and result.content:
                 # Validate and clean the data
                 try:
-                    cleaned_data = self._validate_data(result.data.__dict__)
+                    cleaned_data = self._validate_data(result.content)
                     self.cleaned_data = cleaned_data
                     
                     # Call on_accepted handler if defined
@@ -159,8 +164,8 @@ class ElicitationForm(metaclass=ElicitationFormMeta):
                     
                 except ValidationError as e:
                     logger.error(f"Form validation failed: {e}")
-                    # Could re-elicit with error message, but for now return error
-                    raise
+                    # Re-raise as ElicitationError to distinguish from field validation
+                    raise ValidationError(str(e)) from e
                     
             elif result.action == "decline":
                 # Call on_declined handler if defined  
@@ -173,6 +178,10 @@ class ElicitationForm(metaclass=ElicitationFormMeta):
                 handler_result = await self._call_handler('on_canceled')
                 
                 return ElicitationResult(action="cancel", form=self)
+        
+        except ValidationError:
+            # Let ValidationError bubble up to the tool for handling
+            raise
                 
         except Exception as e:
             logger.error(f"Elicitation failed: {e}")
@@ -253,14 +262,28 @@ class ElicitationForm(metaclass=ElicitationFormMeta):
     # Convenience methods for accessing field values
     def __getattr__(self, name: str) -> Any:
         """Allow accessing cleaned data as form.field_name."""
-        if name in self.cleaned_data:
-            return self.cleaned_data[name]
-        elif name in self._fields:
-            return self._fields[name].default
+        # Avoid recursion during initialization
+        if name in ('cleaned_data', '_fields', '_field_overrides'):
+            raise AttributeError(f"'{self.__class__.__name__}' has no attribute '{name}'")
+        
+        cleaned_data = super().__getattribute__('cleaned_data')
+        if name in cleaned_data:
+            return cleaned_data[name]
+        
+        fields = super().__getattribute__('_fields')
+        if name in fields:
+            return fields[name].default
+            
         raise AttributeError(f"'{self.__class__.__name__}' has no attribute '{name}'")
     
     def __setattr__(self, name: str, value: Any) -> None:
         """Allow setting field values as form.field_name = value."""
+        # During initialization, set attributes directly
+        if not hasattr(self, 'cleaned_data') or name in ('cleaned_data', '_fields', '_field_overrides', 'message'):
+            super().__setattr__(name, value)
+            return
+            
+        # After initialization, check if it's a field
         if hasattr(self, '_fields') and name in self._fields:
             self.cleaned_data[name] = value
         else:

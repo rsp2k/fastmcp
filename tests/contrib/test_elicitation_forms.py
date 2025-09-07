@@ -565,8 +565,9 @@ class TestFormElicitationIntegration:
         # Test without elicitation handler (simulates unsupported client)
         async def test_fallback():
             async with Client(mcp) as client:  # No elicitation handler
-                with pytest.raises(ToolError, match="Elicitation not supported"):
-                    await client.call_tool("try_elicit")
+                result = await client.call_tool("try_elicit")
+                assert "Elicitation failed" in result.data
+                assert "ElicitationNotSupportedError" in result.data
 
         import asyncio
         asyncio.run(test_fallback())

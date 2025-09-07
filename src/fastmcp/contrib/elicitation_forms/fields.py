@@ -103,6 +103,10 @@ class StringField(BaseField):
         if not isinstance(value, str):
             raise ValidationError(f"{self.title} must be a string")
             
+        # Check if required field has empty string
+        if self.required and value == "":
+            raise ValidationError(f"{self.title} is required")
+            
         if self.min_length is not None and len(value) < self.min_length:
             raise ValidationError(f"{self.title} must be at least {self.min_length} characters")
             

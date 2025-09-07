@@ -263,3 +263,5 @@ uv sync                    # Installs all deps including dev tools
 2. **Pre-commit fails**: Run `uv run pre-commit run --all-files` to see failures
 3. **Type errors**: Use `uv run ty check` directly, check `pyproject.toml` config
 4. **Test timeouts**: Default 3s - optimize or mark as integration tests
+- VERY IMPORTANT NOTE about `gh pr` and `--draft`: The `--draft` option DOES NOT work with `gh pr create`
+Always create drafts in a local file, and display full path/contents to user
