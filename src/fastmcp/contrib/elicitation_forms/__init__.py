@@ -6,7 +6,7 @@ that work with FastMCP's native elicitation infrastructure.
 """
 from __future__ import annotations
 
-from .exceptions import ElicitationError, ValidationError
+from .exceptions import ElicitationError, ElicitationNotSupportedError, ValidationError
 from .fields import (
     BooleanField,
     EnumField,
@@ -26,5 +26,6 @@ __all__ = [
     "EnumField",
     "EnumFieldChoices",
     "ElicitationError",
+    "ElicitationNotSupportedError",
     "ValidationError",
 ]
