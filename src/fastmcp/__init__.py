@@ -19,6 +19,9 @@ import fastmcp.server
 from fastmcp.client import Client
 from . import client
 
+# New type annotation completion system
+from . import completion
+
 __version__ = _version("fastmcp")
 
 
@@ -52,5 +55,6 @@ __all__ = [
     "Context",
     "client",
     "Client",
+    "completion",
     "settings",
 ]

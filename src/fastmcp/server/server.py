@@ -52,6 +52,7 @@ from starlette.routing import BaseRoute, Route
 
 import fastmcp
 import fastmcp.server
+from fastmcp.completion import CompletionProvider, extract_completion_providers
 from fastmcp.exceptions import DisabledError, NotFoundError
 from fastmcp.mcp_config import MCPConfig
 from fastmcp.prompts import Prompt, PromptManager
@@ -201,6 +202,9 @@ class FastMCP(Generic[LifespanResultT]):
 
         # Storage for completion handlers
         self._completion_handlers: dict[str, Callable[..., Awaitable[list[str]]]] = {}
+
+        # Storage for type annotation completion providers (NEW)
+        self._completion_providers: dict[str, dict[str, CompletionProvider]] = {}
 
         if lifespan is None:
             self._has_lifespan = False
@@ -904,7 +908,38 @@ class FastMCP(Generic[LifespanResultT]):
 
         handler_key = f"{ref_type}:{ref_identifier}:{argument.name}"
 
-        # Look for registered completion handler
+        # First, check for type annotation completion providers (NEW SYSTEM)
+        component_key = ref_identifier  # For tools and prompts, this is the key/name
+        if component_key in self._completion_providers:
+            providers = self._completion_providers[component_key]
+            if argument.name in providers:
+                provider = providers[argument.name]
+                try:
+                    # Execute the completion provider with server context
+                    completion_values = await provider.complete(
+                        argument.value,
+                        context={"ref": ref, "argument": argument, "server": self},
+                    )
+
+                    # Limit to 100 items per MCP spec
+                    completion_values = (
+                        completion_values[:100] if completion_values else []
+                    )
+
+                    return CompleteResult(
+                        completion=Completion(
+                            values=completion_values,
+                            total=len(completion_values),
+                            hasMore=len(completion_values) == 100,
+                        )
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Type annotation completion provider error for {component_key}.{argument.name}: {e}"
+                    )
+                    # Fall through to string-based handler or empty result
+
+        # Fallback to string-based completion handlers (LEGACY SYSTEM)
         if handler_key in self._completion_handlers:
             handler = self._completion_handlers[handler_key]
             try:
@@ -1118,6 +1153,15 @@ class FastMCP(Generic[LifespanResultT]):
                 enabled=enabled,
             )
             self.add_tool(tool)
+
+            # Extract and store completion providers from type annotations (NEW)
+            providers = extract_completion_providers(fn)
+            if providers:
+                self._completion_providers[tool.key] = providers
+                logger.debug(
+                    f"[{self.name}] Extracted completion providers for tool '{tool.key}': {list(providers.keys())}"
+                )
+
             return tool
 
         elif isinstance(name_or_fn, str):
@@ -1529,6 +1573,14 @@ class FastMCP(Generic[LifespanResultT]):
             )
             self.add_prompt(prompt)
 
+            # Extract and store completion providers from type annotations (NEW)
+            providers = extract_completion_providers(fn)
+            if providers:
+                self._completion_providers[prompt.key] = providers
+                logger.debug(
+                    f"[{self.name}] Extracted completion providers for prompt '{prompt.key}': {list(providers.keys())}"
+                )
+
             return prompt
 
         elif isinstance(name_or_fn, str):
@@ -1928,6 +1980,16 @@ class FastMCP(Generic[LifespanResultT]):
         self._resource_manager.mount(mounted_server)
         self._prompt_manager.mount(mounted_server)
 
+        # Mount type annotation completion providers (NEW)
+        if hasattr(server, "_completion_providers") and server._completion_providers:
+            for component_key, providers in server._completion_providers.items():
+                # Apply prefix to component key to match the prefixed component names
+                prefixed_key = f"{prefix}_{component_key}" if prefix else component_key
+                self._completion_providers[prefixed_key] = providers
+                logger.debug(
+                    f"[{self.name}] Mounted completion providers for '{prefixed_key}': {list(providers.keys())}"
+                )
+
     async def import_server(
         self,
         server: FastMCP[LifespanResultT],
@@ -2048,6 +2110,16 @@ class FastMCP(Generic[LifespanResultT]):
             if prefix:
                 prompt = prompt.model_copy(key=f"{prefix}_{key}")
             self._prompt_manager.add_prompt(prompt)
+
+        # Import type annotation completion providers (NEW)
+        if hasattr(server, "_completion_providers") and server._completion_providers:
+            for component_key, providers in server._completion_providers.items():
+                # Apply prefix to component key to match the prefixed component names
+                prefixed_key = f"{prefix}_{component_key}" if prefix else component_key
+                self._completion_providers[prefixed_key] = providers
+                logger.debug(
+                    f"[{self.name}] Imported completion providers for '{prefixed_key}': {list(providers.keys())}"
+                )
 
         if prefix:
             logger.debug(

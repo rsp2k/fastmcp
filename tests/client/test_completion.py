@@ -1,5 +1,6 @@
-import pytest
 import mcp.types
+import pytest
+
 from fastmcp import Client, FastMCP
 from fastmcp.resources import ResourceTemplate
 
@@ -34,7 +35,7 @@ def completion_server():
         uri_template="file:///{path}",
         name="File Resource",
         description="Access files",
-        parameters={}
+        parameters={},
     )
     server.add_template(file_template)
 
@@ -56,7 +57,7 @@ class TestClientCompletion:
         async with Client(completion_server) as client:
             result = await client.complete(
                 mcp.types.PromptReference(type="ref/prompt", name="analyze_data"),
-                {"name": "dataset", "value": ""}
+                {"name": "dataset", "value": ""},
             )
 
             assert isinstance(result, mcp.types.Completion)
@@ -69,7 +70,7 @@ class TestClientCompletion:
         async with Client(completion_server) as client:
             result = await client.complete(
                 mcp.types.PromptReference(type="ref/prompt", name="analyze_data"),
-                {"name": "dataset", "value": "c"}
+                {"name": "dataset", "value": "c"},
             )
 
             assert isinstance(result, mcp.types.Completion)
@@ -82,7 +83,7 @@ class TestClientCompletion:
         async with Client(completion_server) as client:
             result = await client.complete_mcp(
                 mcp.types.PromptReference(type="ref/prompt", name="analyze_data"),
-                {"name": "analysis_type", "value": "s"}
+                {"name": "analysis_type", "value": "s"},
             )
 
             assert isinstance(result, mcp.types.CompleteResult)
@@ -95,12 +96,19 @@ class TestClientCompletion:
         """Test completion for resource template with no partial input."""
         async with Client(completion_server) as client:
             result = await client.complete(
-                mcp.types.ResourceTemplateReference(type="ref/resource", uri="file:///{path}"),
-                {"name": "path", "value": ""}
+                mcp.types.ResourceTemplateReference(
+                    type="ref/resource", uri="file:///{path}"
+                ),
+                {"name": "path", "value": ""},
             )
 
             assert isinstance(result, mcp.types.Completion)
-            assert result.values == ["config.json", "data.csv", "readme.txt", "script.py"]
+            assert result.values == [
+                "config.json",
+                "data.csv",
+                "readme.txt",
+                "script.py",
+            ]
             assert result.total == 4
             assert result.hasMore is False
 
@@ -108,8 +116,10 @@ class TestClientCompletion:
         """Test completion for resource template with partial input."""
         async with Client(completion_server) as client:
             result = await client.complete(
-                mcp.types.ResourceTemplateReference(type="ref/resource", uri="file:///{path}"),
-                {"name": "path", "value": "c"}
+                mcp.types.ResourceTemplateReference(
+                    type="ref/resource", uri="file:///{path}"
+                ),
+                {"name": "path", "value": "c"},
             )
 
             assert isinstance(result, mcp.types.Completion)
@@ -122,7 +132,7 @@ class TestClientCompletion:
         async with Client(completion_server) as client:
             result = await client.complete(
                 mcp.types.PromptReference(type="ref/prompt", name="nonexistent"),
-                {"name": "arg", "value": "test"}
+                {"name": "arg", "value": "test"},
             )
 
             assert isinstance(result, mcp.types.Completion)
@@ -135,7 +145,7 @@ class TestClientCompletion:
         async with Client(completion_server) as client:
             result = await client.complete(
                 mcp.types.PromptReference(type="ref/prompt", name="analyze_data"),
-                {"name": "nonexistent_arg", "value": "test"}
+                {"name": "nonexistent_arg", "value": "test"},
             )
 
             assert isinstance(result, mcp.types.Completion)
@@ -167,14 +177,14 @@ class TestClientCompletion:
             # Test first prompt
             result1 = await client.complete(
                 mcp.types.PromptReference(type="ref/prompt", name="prompt1"),
-                {"name": "dataset", "value": ""}
+                {"name": "dataset", "value": ""},
             )
             assert result1.values == ["dataset1_a", "dataset1_b"]
 
             # Test second prompt
             result2 = await client.complete(
                 mcp.types.PromptReference(type="ref/prompt", name="prompt2"),
-                {"name": "dataset", "value": ""}
+                {"name": "dataset", "value": ""},
             )
             assert result2.values == ["dataset2_x", "dataset2_y"]
 
@@ -184,14 +194,14 @@ class TestClientCompletion:
             # Test uppercase partial
             result = await client.complete(
                 mcp.types.PromptReference(type="ref/prompt", name="analyze_data"),
-                {"name": "dataset", "value": "C"}
+                {"name": "dataset", "value": "C"},
             )
             assert result.values == ["customers"]
 
             # Test mixed case partial
             result = await client.complete(
                 mcp.types.PromptReference(type="ref/prompt", name="analyze_data"),
-                {"name": "dataset", "value": "CuS"}
+                {"name": "dataset", "value": "CuS"},
             )
             assert result.values == ["customers"]
 
@@ -210,7 +220,7 @@ class TestClientCompletion:
         async with Client(server) as client:
             result = await client.complete(
                 mcp.types.PromptReference(type="ref/prompt", name="test_prompt"),
-                {"name": "arg", "value": "test"}
+                {"name": "arg", "value": "test"},
             )
 
             assert result.values == []
@@ -233,7 +243,7 @@ class TestClientCompletion:
             # Should return empty completion on error
             result = await client.complete(
                 mcp.types.PromptReference(type="ref/prompt", name="test_prompt"),
-                {"name": "arg", "value": "test"}
+                {"name": "arg", "value": "test"},
             )
 
             assert result.values == []
@@ -256,7 +266,7 @@ class TestClientCompletion:
         async with Client(server) as client:
             result = await client.complete(
                 mcp.types.PromptReference(type="ref/prompt", name="test_prompt"),
-                {"name": "arg", "value": ""}
+                {"name": "arg", "value": ""},
             )
 
             assert len(result.values) == 100
@@ -278,13 +288,15 @@ class TestClientCompletion:
             languages = ["English", "Français", "Español", "中文", "日本語", "العربية"]
             if not partial:
                 return languages
-            return [lang for lang in languages if lang.lower().startswith(partial.lower())]
+            return [
+                lang for lang in languages if lang.lower().startswith(partial.lower())
+            ]
 
         async with Client(server) as client:
             # Test no partial
             result = await client.complete(
                 mcp.types.PromptReference(type="ref/prompt", name="test_prompt"),
-                {"name": "lang", "value": ""}
+                {"name": "lang", "value": ""},
             )
             assert "中文" in result.values
             assert "العربية" in result.values
@@ -292,6 +304,6 @@ class TestClientCompletion:
             # Test partial matching
             result = await client.complete(
                 mcp.types.PromptReference(type="ref/prompt", name="test_prompt"),
-                {"name": "lang", "value": "f"}
+                {"name": "lang", "value": "f"},
             )
             assert result.values == ["Français"]
